@@ -345,7 +345,7 @@ class EmergencyNeedsScraper:
         
         print(f"\n✓ Downloaded {successful}/{total} images")
     
-    def save_to_excel(self):
+    def save_to_excel(self, include_s3_paths=False):
         """Save data to Excel file"""
         
         print("\n" + "="*70)
@@ -358,6 +358,11 @@ class EmergencyNeedsScraper:
         
         # Create DataFrame
         df = pd.DataFrame(self.products)
+        
+        # Remove local_image_path column if S3 is configured
+        if include_s3_paths and 'local_image_path' in df.columns:
+            df = df.drop(columns=['local_image_path'])
+            print("✓ Removed 'local_image_path' column")
         
         # Generate filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -387,23 +392,18 @@ class EmergencyNeedsScraper:
             print(f"❌ Error uploading to S3: {e}")
             return False
     
-    def upload_results_to_s3(self, excel_path):
+    def upload_results_to_s3(self):
         """Upload Excel and images to S3 with date partitioning"""
         
         if not self.s3_client:
             print("\n⚠ S3 not configured, skipping S3 upload")
-            return
+            return None
         
         print("\n" + "="*70)
         print("☁️  UPLOADING TO S3")
         print("="*70)
         
-        # Upload Excel file
-        excel_s3_key = f"sheeel_data/year={self.year}/month={self.month}/day={self.day}/{self.category}/excel-files/{os.path.basename(excel_path)}"
-        print(f"\n📊 Uploading Excel file...")
-        self.upload_to_s3(excel_path, excel_s3_key)
-        
-        # Upload images
+        # Upload images first and add S3 paths
         print(f"\n📷 Uploading images...")
         uploaded_images = 0
         for product in self.products:
@@ -420,13 +420,28 @@ class EmergencyNeedsScraper:
         
         print(f"\n✓ Uploaded {uploaded_images} images to S3")
         
-        # Save updated data with S3 paths
+        # Create ONE Excel file with S3 paths (without local_image_path column)
+        print(f"\n📊 Creating Excel file with S3 paths...")
         df = pd.DataFrame(self.products)
-        updated_excel = str(self.local_data_dir / f"emergency_needs_with_s3_paths.xlsx")
-        df.to_excel(updated_excel, index=False, engine='openpyxl')
         
-        updated_s3_key = f"sheeel_data/year={self.year}/month={self.month}/day={self.day}/{self.category}/excel-files/emergency_needs_with_s3_paths.xlsx"
-        self.upload_to_s3(updated_excel, updated_s3_key)
+        # Remove local_image_path column
+        if 'local_image_path' in df.columns:
+            df = df.drop(columns=['local_image_path'])
+            print("✓ Removed 'local_image_path' column")
+        
+        # Save locally
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        excel_filename = f"emergency_needs_{timestamp}.xlsx"
+        excel_local_path = str(self.local_data_dir / excel_filename)
+        df.to_excel(excel_local_path, index=False, engine='openpyxl')
+        print(f"✓ Saved to: {excel_local_path}")
+        print(f"  Rows: {len(df)}, Columns: {len(df.columns)}")
+        
+        # Upload to S3
+        excel_s3_key = f"sheeel_data/year={self.year}/month={self.month}/day={self.day}/{self.category}/excel-files/{excel_filename}"
+        self.upload_to_s3(excel_local_path, excel_s3_key)
+        
+        return excel_local_path
     
     def run(self):
         """Main execution flow"""
@@ -449,12 +464,13 @@ class EmergencyNeedsScraper:
         # Step 2: Download images
         self.download_all_images()
         
-        # Step 3: Save to Excel
-        excel_path = self.save_to_excel()
-        
-        # Step 4: Upload to S3
-        if excel_path and self.s3_client:
-            self.upload_results_to_s3(excel_path)
+        # Step 3: Save to Excel and upload to S3
+        if self.s3_client:
+            # Use S3 upload which creates Excel with S3 paths
+            excel_path = self.upload_results_to_s3()
+        else:
+            # Local only - save Excel with local paths
+            excel_path = self.save_to_excel()
         
         # Summary
         print("\n" + "="*70)
