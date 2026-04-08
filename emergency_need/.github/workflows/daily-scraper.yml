@@ -1,0 +1,64 @@
+name: Daily Emergency Needs Scraper
+
+on:
+  schedule:
+    # Run daily at 2:00 AM UTC
+    - cron: '0 2 * * *'
+  
+  workflow_dispatch:  # Allow manual trigger
+  
+  push:
+    branches:
+      - main
+    paths:
+      - 'emergency_need/**'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd emergency_need
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Install Playwright browsers
+        run: |
+          playwright install chromium
+          playwright install-deps chromium
+      
+      - name: Run scraper
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+        run: |
+          cd emergency_need
+          python scraper.py
+      
+      - name: Upload artifacts (backup)
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: scraping-results
+          path: |
+            emergency_need/data/*.xlsx
+            emergency_need/data/images/*.jpg
+            emergency_need/data/images/*.png
+          retention-days: 7
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Scraping job failed! Check the logs."
+          # Add notification logic here (Slack, email, etc.)

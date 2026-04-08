@@ -1,0 +1,16 @@
+# Python dependencies for Emergency Needs Scraper
+
+# Web scraping
+playwright==1.40.0
+requests==2.31.0
+beautifulsoup4==4.12.0
+
+# Data processing
+pandas==2.1.0
+openpyxl==3.1.2
+
+# AWS
+boto3==1.34.0
+
+# Utilities
+python-dotenv==1.0.0
