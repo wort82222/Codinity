@@ -7,11 +7,6 @@ on:
   
   workflow_dispatch:  # Allow manual trigger
   
-  push:
-    branches:
-      - main
-    paths:
-      - 'emergency_need/**'
 
 jobs:
   scrape:
@@ -47,7 +42,7 @@ jobs:
           python scraper.py
       
       - name: Upload artifacts (backup)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: scraping-results
