@@ -303,13 +303,25 @@ class LongLifeFoodScraper:
             return None
         
         try:
-            # Generate unique filename
-            ext = os.path.splitext(urlparse(image_url).path)[1] or '.jpg'
-            filename = f"{product_id}{ext}"
-            
             # Download image
             response = requests.get(image_url, timeout=10, stream=True)
             response.raise_for_status()
+            
+            # Detect proper extension from Content-Type header
+            content_type = response.headers.get('Content-Type', '').lower()
+            if 'jpeg' in content_type or 'jpg' in content_type:
+                ext = '.jpg'
+            elif 'png' in content_type:
+                ext = '.png'
+            elif 'gif' in content_type:
+                ext = '.gif'
+            elif 'webp' in content_type:
+                ext = '.webp'
+            else:
+                # Fallback to URL extension or .jpg
+                ext = os.path.splitext(urlparse(image_url).path)[1] or '.jpg'
+            
+            filename = f"{product_id}{ext}"
             
             # Save locally
             local_path = self.local_images_dir / filename
