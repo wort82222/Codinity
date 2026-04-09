@@ -204,41 +204,80 @@ class EmergencyNeedsScraper:
             return 1
     
     def scrape_page(self, page, page_num):
-        """Scrape a single page"""
-        
+        """Scrape a single page by visiting each product link and extracting full details"""
         print(f"\n{'='*70}")
         print(f"📄 SCRAPING PAGE {page_num}")
         print("="*70)
-        
         try:
             # Wait for products
-            page.wait_for_selector('[id^="product-item-info_"]', timeout=10000)
-            
+            page.wait_for_selector('[id^="product-item-info_"] > a', timeout=10000)
             # Scroll to load all products
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             time.sleep(2)
-            
-            # Get products
-            products = page.query_selector_all('[id^="product-item-info_"]')
-            print(f"✓ Found {len(products)} products on page {page_num}")
-            
-            # Extract data
+            # Get all product links
+            product_links = page.eval_on_selector_all('[id^="product-item-info_"] > a', 'elements => elements.map(e => e.href)')
+            print(f"✓ Found {len(product_links)} product links on page {page_num}")
+            # Extract data from each product page
             page_products = []
-            for i, product in enumerate(products, 1):
-                product_data = self.extract_product_from_element(product)
+            for i, product_url in enumerate(product_links, 1):
+                print(f"  → Visiting product {i}/{len(product_links)}: {product_url}")
+                product_data = self.scrape_product_detail(page.context, product_url)
                 if product_data:
                     product_data['page_number'] = page_num
                     page_products.append(product_data)
-                    
-                if i % 10 == 0:
-                    print(f"  Processed {i}/{len(products)} products...")
-            
+                if i % 5 == 0:
+                    print(f"    Processed {i}/{len(product_links)} products...")
             print(f"✓ Successfully extracted {len(page_products)} products from page {page_num}")
             return page_products
-            
         except Exception as e:
             print(f"❌ Error scraping page {page_num}: {e}")
             return []
+
+    def scrape_product_detail(self, context, product_url):
+        """Visit product detail page and extract all available fields"""
+        try:
+            detail_page = context.new_page()
+            detail_page.goto(product_url, wait_until='networkidle', timeout=30000)
+            detail_page.wait_for_selector('#maincontent .product-info-main', timeout=10000)
+            # Extract fields from product-info-main
+            info = detail_page.query_selector('#maincontent .product-info-main')
+            product_data = {}
+            # Title
+            title_el = info.query_selector('.page-title .base')
+            product_data['name'] = title_el.inner_text().strip() if title_el else None
+            # SKU
+            sku_el = detail_page.query_selector('.product-info.sku')
+            product_data['sku'] = sku_el.inner_text().split(':')[0].strip() if sku_el else None
+            # Availability
+            avail_el = detail_page.query_selector('.availability-info')
+            product_data['availability'] = avail_el.inner_text().strip() if avail_el else None
+            # Times bought
+            bought_el = detail_page.query_selector('.x-bought-count')
+            product_data['times_bought'] = bought_el.inner_text().strip() if bought_el else None
+            # Old price
+            old_price_el = detail_page.query_selector('.old-price .price')
+            product_data['old_price'] = old_price_el.inner_text().strip() if old_price_el else None
+            # Special price
+            special_price_el = detail_page.query_selector('.special-price .price')
+            product_data['special_price'] = special_price_el.inner_text().strip() if special_price_el else None
+            # Description
+            desc_el = detail_page.query_selector('.product.attribute.overview .value')
+            product_data['description'] = desc_el.inner_text().strip() if desc_el else None
+            # Features (from more-info tab)
+            features = []
+            for li in detail_page.query_selector_all('#more-info ul li'):
+                features.append(li.inner_text().strip())
+            product_data['features'] = features
+            # Product URL
+            product_data['url'] = product_url
+            # Scraped at
+            product_data['scraped_at'] = datetime.now().isoformat()
+            detail_page.close()
+            return product_data
+        except Exception as e:
+            print(f"    ⚠ Error extracting product detail: {e}")
+            return None
+
     
     def scrape_all_pages(self):
         """Scrape all pages with pagination"""
