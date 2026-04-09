@@ -1,15 +1,28 @@
-name: Daily Long Life Food Scraper
+name: Daily Scrapers - All Categories
 
 on:
   schedule:
-    # Run daily at 3:00 AM UTC
-    - cron: '0 3 * * *'
+    # Run daily at 12:00 AM UTC
+    - cron: '0 0 * * *'
   
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
   scrape:
     runs-on: ubuntu-22.04
+    
+    strategy:
+      fail-fast: false  # Continue other jobs even if one fails
+      matrix:
+        category:
+          - name: emergency_need
+            display_name: Emergency Needs
+          - name: power_bank_chargers
+            display_name: Power Banks & Chargers
+          - name: long_life_food
+            display_name: Long Life Food
+    
+    name: Scrape ${{ matrix.category.display_name }}
     
     steps:
       - name: Checkout code
@@ -22,7 +35,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          cd long_life_food
+          cd ${{ matrix.category.name }}
           pip install --upgrade pip
           pip install -r requirements.txt
       
@@ -37,22 +50,24 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
         run: |
-          cd long_life_food
+          cd ${{ matrix.category.name }}
           python scraper.py
       
       - name: Upload artifacts (backup)
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: long-life-food-results
+          name: ${{ matrix.category.name }}-results
           path: |
-            long_life_food/data/*.xlsx
-            long_life_food/data/images/*.jpg
-            long_life_food/data/images/*.png
+            ${{ matrix.category.name }}/data/*.xlsx
+            ${{ matrix.category.name }}/data/images/*.jpg
+            ${{ matrix.category.name }}/data/images/*.png
+            ${{ matrix.category.name }}/data/images/*.gif
+            ${{ matrix.category.name }}/data/images/*.webp
           retention-days: 7
       
       - name: Notify on failure
         if: failure()
         run: |
-          echo "Scraping job failed! Check the logs."
+          echo "Scraping job for ${{ matrix.category.display_name }} failed! Check the logs."
           # Add notification logic here (Slack, email, etc.)
