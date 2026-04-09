@@ -1,16 +1,15 @@
-name: Daily Emergency Needs Scraper
+name: Daily Long Life Food Scraper
 
 on:
   schedule:
-    # Run daily at 12:00 AM UTC
-    - cron: '0 0 * * *'
+    # Run daily at 3:00 AM UTC
+    - cron: '0 3 * * *'
   
   workflow_dispatch:  # Allow manual trigger
-  
 
 jobs:
   scrape:
-    runs-on: ubuntu-22.04  # Use 22.04 for stable Playwright dependencies
+    runs-on: ubuntu-22.04
     
     steps:
       - name: Checkout code
@@ -23,7 +22,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          cd emergency_need
+          cd long_life_food
           pip install --upgrade pip
           pip install -r requirements.txt
       
@@ -38,18 +37,18 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
         run: |
-          cd emergency_need
+          cd long_life_food
           python scraper.py
       
       - name: Upload artifacts (backup)
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: scraping-results
+          name: long-life-food-results
           path: |
-            emergency_need/data/*.xlsx
-            emergency_need/data/images/*.jpg
-            emergency_need/data/images/*.png
+            long_life_food/data/*.xlsx
+            long_life_food/data/images/*.jpg
+            long_life_food/data/images/*.png
           retention-days: 7
       
       - name: Notify on failure
