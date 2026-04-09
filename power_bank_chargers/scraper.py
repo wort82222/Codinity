@@ -113,9 +113,11 @@ class PowerBankChargersScraper:
                 product_data['discount_percent'] = None
             
             # ===== IMAGES =====
-            img_el = product_element.query_selector('img.product-image-photo')
+            # Try multiple selectors to find the image
+            img_el = product_element.query_selector('a img') or product_element.query_selector('img.product-image-photo') or product_element.query_selector('img')
             if img_el:
-                product_data['image_url'] = img_el.get_attribute('src') or img_el.get_attribute('data-src')
+                # Get image URL - prefer data-src for lazy-loaded images
+                product_data['image_url'] = img_el.get_attribute('data-src') or img_el.get_attribute('src')
                 product_data['image_alt'] = img_el.get_attribute('alt')
                 product_data['image_width'] = img_el.get_attribute('width')
                 product_data['image_height'] = img_el.get_attribute('height')
