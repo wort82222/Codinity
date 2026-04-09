@@ -248,6 +248,13 @@ class LongLifeFoodScraper:
             info = detail_page.query_selector('#maincontent .product-info-main')
             product_data = {}
             
+            # Product ID from form
+            product_id_input = detail_page.query_selector('input[name="product"]')
+            if product_id_input:
+                product_data['product_id'] = int(product_id_input.get_attribute('value'))
+            else:
+                product_data['product_id'] = None
+            
             # Title
             title_el = info.query_selector('.page-title .base')
             product_data['name'] = title_el.inner_text().strip() if title_el else None
@@ -276,11 +283,30 @@ class LongLifeFoodScraper:
             desc_el = detail_page.query_selector('.product.attribute.overview .value')
             product_data['description'] = desc_el.inner_text().strip() if desc_el else None
             
+            # Image from product gallery
+            img_el = detail_page.query_selector('#maincontent .product.media .desktop-product-gallery img')
+            if img_el:
+                product_data['image_url'] = img_el.get_attribute('data-src') or img_el.get_attribute('src')
+            else:
+                product_data['image_url'] = None
+            
+            # Deal timer
+            timer_el = detail_page.query_selector('#deal-timer .time')
+            product_data['deal_time_left'] = timer_el.inner_text().strip() if timer_el else None
+            
+            # Discount badge
+            discount_el = detail_page.query_selector('.discount-percent-item')
+            product_data['discount_badge'] = discount_el.inner_text().strip() if discount_el else None
+            
             # Features (from more-info tab)
             features = []
             for li in detail_page.query_selector_all('#more-info ul li'):
                 features.append(li.inner_text().strip())
             product_data['features'] = features
+            
+            # Flatten features into separate columns (features_0, features_1, etc.)
+            for i, feature in enumerate(features):
+                product_data[f'feature_{i}'] = feature
             
             # Product URL
             product_data['url'] = product_url
