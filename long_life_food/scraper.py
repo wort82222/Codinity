@@ -305,15 +305,43 @@ class LongLifeFoodScraper:
             discount_el = detail_page.query_selector('.discount-percent-item')
             product_data['discount_badge'] = discount_el.inner_text().strip() if discount_el else None
             
-            # Features (from more-info tab)
-            features = []
-            for li in detail_page.query_selector_all('#more-info ul li'):
-                features.append(li.inner_text().strip())
-            product_data['features'] = features
-            
-            # Flatten features into separate columns (features_0, features_1, etc.)
-            for i, feature in enumerate(features):
-                product_data[f'feature_{i}'] = feature
+            # Extract features by section with labels
+            more_info_container = detail_page.query_selector('#more-info')
+            if more_info_container:
+                # Get all attribute sections
+                attribute_labels = more_info_container.query_selector_all('.attribute-info.label')
+                
+                for label_el in attribute_labels:
+                    section_name = label_el.inner_text().strip()
+                    
+                    # Get the next sibling <ul> element
+                    ul_element = label_el.evaluate_handle('node => node.nextElementSibling')
+                    
+                    # Extract list items
+                    section_features = []
+                    try:
+                        li_elements = ul_element.as_element().query_selector_all('li')
+                        for li in li_elements:
+                            section_features.append(li.inner_text().strip())
+                    except:
+                        pass
+                    
+                    # Store features based on section name
+                    if 'المميزات' in section_name or 'المواصفات' in section_name:
+                        product_data['features_specs'] = section_features
+                        # Flatten features_specs
+                        for i, feature in enumerate(section_features):
+                            product_data[f'feature_spec_{i}'] = feature
+                    elif 'محتوى' in section_name or 'العلبة' in section_name:
+                        # Box contents - single value
+                        product_data['box_contents'] = section_features[0] if section_features else None
+                    elif 'الكفالة' in section_name or 'ضمان' in section_name:
+                        # Warranty - single value
+                        product_data['warranty'] = section_features[0] if section_features else None
+                    else:
+                        # For any other sections, store with sanitized key
+                        key = section_name.replace(' ', '_').replace(':', '')
+                        product_data[f'other_{key}'] = section_features
             
             # Product URL
             product_data['url'] = product_url
