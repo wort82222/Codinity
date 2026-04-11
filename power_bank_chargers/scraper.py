@@ -293,10 +293,6 @@ class PowerBankChargersScraper:
             
             product_data['image_urls'] = image_urls  # Store as array
             
-            # Flatten images into separate columns (image_0, image_1, etc.)
-            for i, img_url in enumerate(image_urls):
-                product_data[f'image_{i}'] = img_url
-            
             # Deal timer
             timer_el = detail_page.query_selector('#deal-timer .time')
             product_data['deal_time_left'] = timer_el.inner_text().strip() if timer_el else None
@@ -481,10 +477,6 @@ class PowerBankChargersScraper:
             
             # Store all local paths as array
             product['local_image_paths'] = local_image_paths
-            
-            # Flatten local paths into separate columns
-            for idx, local_path in enumerate(local_image_paths):
-                product[f'local_image_{idx}'] = local_path
                     
             if i % 10 == 0:
                 print(f"  Processed {i}/{total_products} products...")
@@ -574,10 +566,6 @@ class PowerBankChargersScraper:
             
             # Store S3 paths as array
             product['s3_image_paths'] = s3_image_paths
-            
-            # Flatten S3 paths into separate columns
-            for idx, s3_path in enumerate(s3_image_paths):
-                product[f's3_image_{idx}'] = s3_path
         
         print(f"\n✓ Uploaded {total_images_uploaded} images to S3")
         
@@ -585,11 +573,10 @@ class PowerBankChargersScraper:
         print(f"\n📊 Creating Excel file with S3 paths...")
         df = pd.DataFrame(self.products)
         
-        # Remove all local_image columns (local_image_paths, local_image_0, local_image_1, etc.)
-        local_image_cols = [col for col in df.columns if col.startswith('local_image')]
-        if local_image_cols:
-            df = df.drop(columns=local_image_cols)
-            print(f"✓ Removed {len(local_image_cols)} local image columns")
+        # Remove local_image_paths column
+        if 'local_image_paths' in df.columns:
+            df = df.drop(columns=['local_image_paths'])
+            print("✓ Removed 'local_image_paths' column")
         
         # Save locally
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
