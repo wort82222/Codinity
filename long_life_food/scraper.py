@@ -283,12 +283,19 @@ class LongLifeFoodScraper:
             desc_el = detail_page.query_selector('.product.attribute.overview .value')
             product_data['description'] = desc_el.inner_text().strip() if desc_el else None
             
-            # Image from product gallery
-            img_el = detail_page.query_selector('#maincontent .product.media .desktop-product-gallery img')
-            if img_el:
-                product_data['image_url'] = img_el.get_attribute('data-src') or img_el.get_attribute('src')
-            else:
-                product_data['image_url'] = None
+            # All images from product gallery
+            image_elements = detail_page.query_selector_all('.product-gallery-image')
+            image_urls = []
+            for img_el in image_elements:
+                img_url = img_el.get_attribute('data-src') or img_el.get_attribute('src')
+                if img_url:
+                    image_urls.append(img_url)
+            
+            product_data['image_urls'] = image_urls  # Store as array
+            
+            # Flatten images into separate columns (image_0, image_1, etc.)
+            for i, img_url in enumerate(image_urls):
+                product_data[f'image_{i}'] = img_url
             
             # Deal timer
             timer_el = detail_page.query_selector('#deal-timer .time')
@@ -382,7 +389,7 @@ class LongLifeFoodScraper:
                 context.close()
                 browser.close()
     
-    def download_image(self, image_url, product_id):
+    def download_image(self, image_url, product_id, image_index=0):
         """Download product image"""
         
         if not image_url:
@@ -407,7 +414,8 @@ class LongLifeFoodScraper:
                 # Fallback to URL extension or .jpg
                 ext = os.path.splitext(urlparse(image_url).path)[1] or '.jpg'
             
-            filename = f"{product_id}{ext}"
+            # Include index in filename for multiple images
+            filename = f"{product_id}_{image_index}{ext}"
             
             # Save locally
             local_path = self.local_images_dir / filename
@@ -428,20 +436,32 @@ class LongLifeFoodScraper:
         print("📥 DOWNLOADING PRODUCT IMAGES")
         print("="*70)
         
-        total = len(self.products)
-        successful = 0
+        total_products = len(self.products)
+        total_images_downloaded = 0
         
         for i, product in enumerate(self.products, 1):
-            if product.get('image_url'):
-                local_path = self.download_image(product['image_url'], product['product_id'])
+            image_urls = product.get('image_urls', [])
+            if not image_urls:
+                continue
+            
+            local_image_paths = []
+            for idx, img_url in enumerate(image_urls):
+                local_path = self.download_image(img_url, product['product_id'], idx)
                 if local_path:
-                    product['local_image_path'] = local_path
-                    successful += 1
+                    local_image_paths.append(local_path)
+                    total_images_downloaded += 1
+            
+            # Store all local paths as array
+            product['local_image_paths'] = local_image_paths
+            
+            # Flatten local paths into separate columns
+            for idx, local_path in enumerate(local_image_paths):
+                product[f'local_image_{idx}'] = local_path
                     
-                if i % 10 == 0:
-                    print(f"  Downloaded {i}/{total} images...")
+            if i % 10 == 0:
+                print(f"  Processed {i}/{total_products} products...")
         
-        print(f"\n✓ Downloaded {successful}/{total} images")
+        print(f"\n✓ Downloaded {total_images_downloaded} images from {total_products} products")
     
     def save_to_excel(self, include_s3_paths=False):
         """Save data to Excel file"""
@@ -503,29 +523,45 @@ class LongLifeFoodScraper:
         
         # Upload images first and add S3 paths
         print(f"\n📷 Uploading images...")
-        uploaded_images = 0
+        total_images_uploaded = 0
+        
         for product in self.products:
-            if product.get('local_image_path') and os.path.exists(product['local_image_path']):
-                image_filename = os.path.basename(product['local_image_path'])
-                image_s3_key = f"sheeel_data/year={self.year}/month={self.month}/day={self.day}/{self.category}/images/{image_filename}"
-                
-                if self.upload_to_s3(product['local_image_path'], image_s3_key):
-                    product['s3_image_path'] = f"s3://{self.s3_bucket}/{image_s3_key}"
-                    uploaded_images += 1
+            local_image_paths = product.get('local_image_paths', [])
+            if not local_image_paths:
+                continue
+            
+            s3_image_paths = []
+            for idx, local_path in enumerate(local_image_paths):
+                if os.path.exists(local_path):
+                    image_filename = os.path.basename(local_path)
+                    image_s3_key = f"sheeel_data/year={self.year}/month={self.month}/day={self.day}/{self.category}/images/{image_filename}"
                     
-                if uploaded_images % 10 == 0:
-                    print(f"  Uploaded {uploaded_images} images...")
+                    if self.upload_to_s3(local_path, image_s3_key):
+                        s3_path = f"s3://{self.s3_bucket}/{image_s3_key}"
+                        s3_image_paths.append(s3_path)
+                        total_images_uploaded += 1
+                        
+                        if total_images_uploaded % 10 == 0:
+                            print(f"  Uploaded {total_images_uploaded} images...")
+            
+            # Store S3 paths as array
+            product['s3_image_paths'] = s3_image_paths
+            
+            # Flatten S3 paths into separate columns
+            for idx, s3_path in enumerate(s3_image_paths):
+                product[f's3_image_{idx}'] = s3_path
         
-        print(f"\n✓ Uploaded {uploaded_images} images to S3")
+        print(f"\n✓ Uploaded {total_images_uploaded} images to S3")
         
-        # Create ONE Excel file with S3 paths (without local_image_path column)
+        # Create ONE Excel file with S3 paths (without local_image columns)
         print(f"\n📊 Creating Excel file with S3 paths...")
         df = pd.DataFrame(self.products)
         
-        # Remove local_image_path column
-        if 'local_image_path' in df.columns:
-            df = df.drop(columns=['local_image_path'])
-            print("✓ Removed 'local_image_path' column")
+        # Remove all local_image columns (local_image_paths, local_image_0, local_image_1, etc.)
+        local_image_cols = [col for col in df.columns if col.startswith('local_image')]
+        if local_image_cols:
+            df = df.drop(columns=local_image_cols)
+            print(f"✓ Removed {len(local_image_cols)} local image columns")
         
         # Save locally
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
