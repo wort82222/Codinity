@@ -5,7 +5,19 @@ on:
     # Run daily at 12:00 AM UTC
     - cron: '0 0 * * *'
   
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:  # Allow manual trigger with category selection
+    inputs:
+      category:
+        description: 'Select category to scrape'
+        required: true
+        type: choice
+        default: 'all'
+        options:
+          - all
+          - emergency_need
+          - power_bank_chargers
+          - long_life_food
+          - kitchen_fun
 
 jobs:
   scrape:
@@ -21,6 +33,17 @@ jobs:
             display_name: Power Banks & Chargers
           - name: long_life_food
             display_name: Long Life Food
+          - name: kitchen_fun
+            display_name: Kitchen Fun
+    
+    # Run job only if:
+    # 1. Scheduled run (no input), OR
+    # 2. Manual run with "all" selected, OR
+    # 3. Manual run with matching category
+    if: |
+      github.event_name == 'schedule' || 
+      inputs.category == 'all' || 
+      inputs.category == matrix.category.name
     
     name: Scrape ${{ matrix.category.display_name }}
     
