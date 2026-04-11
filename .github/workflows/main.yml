@@ -36,38 +36,45 @@ jobs:
           - name: kitchen_fun
             display_name: Kitchen Fun
     
-    # Run job only if:
-    # 1. Scheduled run (no input), OR
-    # 2. Manual run with "all" selected, OR
-    # 3. Manual run with matching category
-    if: |
-      github.event_name == 'schedule' || 
-      inputs.category == 'all' || 
-      inputs.category == matrix.category.name
-    
     name: Scrape ${{ matrix.category.display_name }}
     
     steps:
+      - name: Check if should run
+        id: should_run
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]] || \
+             [[ "${{ inputs.category }}" == "all" ]] || \
+             [[ "${{ inputs.category }}" == "${{ matrix.category.name }}" ]]; then
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Checkout code
+        if: steps.should_run.outputs.run == 'true'
         uses: actions/checkout@v4
       
       - name: Set up Python
+        if: steps.should_run.outputs.run == 'true'
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
       
       - name: Install dependencies
+        if: steps.should_run.outputs.run == 'true'
         run: |
           cd ${{ matrix.category.name }}
           pip install --upgrade pip
           pip install -r requirements.txt
       
       - name: Install Playwright browsers
+        if: steps.should_run.outputs.run == 'true'
         run: |
           playwright install chromium
           playwright install-deps chromium
       
       - name: Run scraper
+        if: steps.should_run.outputs.run == 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -78,7 +85,7 @@ jobs:
       
       - name: Upload artifacts (backup)
         uses: actions/upload-artifact@v4
-        if: always()
+        if: steps.should_run.outputs.run == 'true' && always()
         with:
           name: ${{ matrix.category.name }}-results
           path: |
@@ -90,7 +97,7 @@ jobs:
           retention-days: 7
       
       - name: Notify on failure
-        if: failure()
+        if: steps.should_run.outputs.run == 'true' && failure()
         run: |
           echo "Scraping job for ${{ matrix.category.display_name }} failed! Check the logs."
           # Add notification logic here (Slack, email, etc.)
