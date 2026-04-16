@@ -280,6 +280,10 @@ class EmergencyNeedsScraper:
             desc_el = detail_page.query_selector('.product.attribute.overview .value')
             product_data['description'] = desc_el.inner_text().strip() if desc_el else None
             
+            # Brand name (optional - may not exist for all products)
+            brand_el = detail_page.query_selector('a.amshopby-brand-title-link')
+            product_data['brand'] = brand_el.inner_text().strip() if brand_el else None
+            
             # All images from product gallery
             image_elements = detail_page.query_selector_all('.product-gallery-image')
             image_urls = []
