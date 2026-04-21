@@ -238,7 +238,11 @@ class EmergencyNeedsScraper:
         """Visit product detail page and extract all available fields"""
         try:
             detail_page = context.new_page()
-            detail_page.goto(product_url, wait_until='networkidle', timeout=30000)
+            response = detail_page.goto(product_url, wait_until='networkidle', timeout=30000)
+            if response and response.status == 404:
+                print(f"       ⚠ Skipping (404 Not Found): {product_url}")
+                detail_page.close()
+                return None
             detail_page.wait_for_selector('#maincontent .product-info-main', timeout=10000)
             
             # Extract fields from product-info-main
@@ -375,7 +379,10 @@ class EmergencyNeedsScraper:
             try:
                 # Load first page
                 print("📡 Loading first page...")
-                page.goto(self.base_url, wait_until='networkidle', timeout=30000)
+                response = page.goto(self.base_url, wait_until='networkidle', timeout=30000)
+                if response and response.status == 404:
+                    print(f"❌ Main category page returned 404 - URL may have changed: {self.base_url}")
+                    return
                 print(f"✓ Page loaded: {page.title()}\n")
                 
                 page_num = 1
@@ -395,7 +402,10 @@ class EmergencyNeedsScraper:
                         # Navigate to next page
                         next_url = f"{self.base_url}?p={page_num}"
                         print(f"📡 Loading page {page_num}: {next_url}")
-                        page.goto(next_url, wait_until='networkidle', timeout=30000)
+                        response = page.goto(next_url, wait_until='networkidle', timeout=30000)
+                        if response and response.status == 404:
+                            print(f"  ⚠ Page {page_num} returned 404, stopping pagination")
+                            break
                     else:
                         print(f"\n✓ No more pages found. Reached last page: {page_num}")
                         break
