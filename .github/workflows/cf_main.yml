@@ -17,6 +17,7 @@ on:
           - emergency_need
           - power_bank_chargers
           - long_life_food
+          - last_pieces
           - kitchen_fun
           - eid_coupons
 
@@ -34,6 +35,8 @@ jobs:
             display_name: Power Banks & Chargers
           - name: long_life_food
             display_name: Long Life Food
+          - name: last_pieces
+            display_name: Last Pieces
           - name: kitchen_fun
             display_name: Kitchen Fun
           - name: eid_coupons
