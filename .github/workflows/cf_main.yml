@@ -18,6 +18,7 @@ on:
           - power_bank_chargers
           - long_life_food
           - kitchen_fun
+          - eid_coupons
 
 jobs:
   scrape:
@@ -35,6 +36,8 @@ jobs:
             display_name: Long Life Food
           - name: kitchen_fun
             display_name: Kitchen Fun
+          - name: eid_coupons
+            display_name: Eid Coupons
 
     name: Scrape ${{ matrix.category.display_name }}
 
