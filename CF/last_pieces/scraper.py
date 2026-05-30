@@ -210,6 +210,16 @@ class LastPiecesScraper:
             product_data['sku'] = sku_el.inner_text().split(':')[0].strip() if sku_el else None
             avail_el = detail_page.query_selector('.availability-info')
             product_data['availability'] = avail_el.inner_text().strip() if avail_el else None
+            availability_only_el = detail_page.query_selector(
+                '#product_addtocart_form .availability.only'
+            )
+            if availability_only_el:
+                product_data['availability_only'] = (
+                    availability_only_el.get_attribute('title')
+                    or availability_only_el.inner_text().strip()
+                )
+            else:
+                product_data['availability_only'] = None
             bought_el = detail_page.query_selector('.x-bought-count')
             product_data['times_bought'] = bought_el.inner_text().strip() if bought_el else None
             old_price_el = detail_page.query_selector('.old-price .price')
