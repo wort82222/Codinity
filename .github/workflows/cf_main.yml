@@ -3,7 +3,7 @@ name: CF Daily Scrapers - All Categories (Cloudflare R2)
 on:
   schedule:
     # Run every 2 days at 1:00 AM UTC
-    - cron: '0 1 */2 * *'
+    - cron: '23 1 */2 * *'
 
   workflow_dispatch: # Allow manual trigger with category selection
     inputs:
